@@ -146,6 +146,13 @@ alter table public.transactions
 alter table public.transactions
   add column if not exists seller_acknowledged boolean not null default false;
 
+alter table public.transactions
+  drop constraint if exists transactions_status_check;
+
+alter table public.transactions
+  add constraint transactions_status_check
+  check (status in ('pending', 'ongoing', 'finalizing', 'completed', 'cancelled')) not valid;
+
 alter table public.profiles enable row level security;
 alter table public.listings enable row level security;
 alter table public.listing_media enable row level security;

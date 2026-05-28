@@ -822,6 +822,10 @@ function App() {
 
   async function finalizeTransactionNow(transaction) {
     if (!authenticatedUser || !transaction) return
+    if (!transaction.buyerAcknowledged || !transaction.sellerAcknowledged) {
+      setStatusMessage('Both sides must acknowledge before finalizing.')
+      return
+    }
 
     try {
       setLoadingAction(true)

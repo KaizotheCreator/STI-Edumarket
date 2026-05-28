@@ -22,6 +22,8 @@ export default function TransactionsScreen({
       ? 'buyer'
       : 'seller'
     : null
+  const buyerAcknowledged = Boolean(selectedTransaction?.buyerAcknowledged)
+  const sellerAcknowledged = Boolean(selectedTransaction?.sellerAcknowledged)
 
   return (
     <AppShell
@@ -153,6 +155,14 @@ export default function TransactionsScreen({
                       label="Condition"
                       value={selectedTransaction.listing?.condition || 'TBD'}
                     />
+                    <Detail
+                      label="Buyer ack"
+                      value={buyerAcknowledged ? 'Acknowledged' : 'Waiting'}
+                    />
+                    <Detail
+                      label="Seller ack"
+                      value={sellerAcknowledged ? 'Acknowledged' : 'Waiting'}
+                    />
                   </div>
 
                   {statusMessage ? <p className="section__note">{statusMessage}</p> : null}
@@ -188,17 +198,9 @@ export default function TransactionsScreen({
                     ) : null}
 
                     {selectedTransaction.status === 'ongoing' && activeRole === 'buyer' ? (
-                      <button
-                        type="button"
-                        className="button button--primary"
-                        onClick={() => onAcknowledgeTransaction(selectedTransaction)}
-                      >
-                        Acknowledge
-                      </button>
-                    ) : null}
-
-                    {selectedTransaction.status === 'ongoing' && activeRole === 'seller' ? (
-                      <>
+                      buyerAcknowledged ? (
+                        <span className="section__note">Acknowledged. Waiting for the seller.</span>
+                      ) : (
                         <button
                           type="button"
                           className="button button--primary"
@@ -206,6 +208,22 @@ export default function TransactionsScreen({
                         >
                           Acknowledge
                         </button>
+                      )
+                    ) : null}
+
+                    {selectedTransaction.status === 'ongoing' && activeRole === 'seller' ? (
+                      <>
+                        {sellerAcknowledged ? (
+                          <span className="section__note">Acknowledged. Waiting for the buyer.</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="button button--primary"
+                            onClick={() => onAcknowledgeTransaction(selectedTransaction)}
+                          >
+                            Acknowledge
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="button button--ghost"
@@ -222,6 +240,7 @@ export default function TransactionsScreen({
                           type="button"
                           className="button button--primary"
                           onClick={() => onFinalizeTransaction(selectedTransaction)}
+                          disabled={!buyerAcknowledged || !sellerAcknowledged}
                         >
                           Finalize
                         </button>
@@ -236,7 +255,9 @@ export default function TransactionsScreen({
                     ) : null}
 
                     {selectedTransaction.status === 'finalizing' && activeRole === 'buyer' ? (
-                      <span className="section__note">Waiting for the seller to finalize the sale.</span>
+                      <span className="section__note">
+                        Both sides acknowledged. Waiting for the seller to finalize the sale.
+                      </span>
                     ) : null}
 
                     {selectedTransaction.status === 'completed' ? (
