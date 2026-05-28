@@ -113,6 +113,7 @@ export default function MarketplaceScreen({
                     const isLockedListing = ['pending', 'ongoing', 'finalizing'].includes(
                       listing.transactionStatus,
                     )
+                    const isSoldListing = listing.transactionStatus === 'sold'
                     const isParticipant =
                       listing.activeBuyerId === user?.profileId ||
                       listing.activeSellerId === user?.profileId
@@ -132,6 +133,7 @@ export default function MarketplaceScreen({
                             <span className={`pill ${listing.free ? 'pill--yellow' : 'pill--blue'}`}>
                               {listing.free ? 'Free' : `PHP ${listing.price}`}
                             </span>
+                            {isSoldListing ? <span className="pill pill--gray card__badge">Sold</span> : null}
                             {preferredItems.includes(listing.category) ? (
                               <span className="pill pill--yellow card__badge">Recommended</span>
                             ) : null}
@@ -265,10 +267,32 @@ export default function MarketplaceScreen({
                     <Detail label="Type" value={selectedListing.type} />
                   </div>
 
+                  {selectedListing.transactionStatus === 'sold' ? (
+                    selectedListing.review ? (
+                      <div className="empty-state empty-state--detail">
+                        <h3>Buyer review</h3>
+                        <p>
+                          {selectedListing.review.rating}/5 stars
+                          {selectedListing.review.body ? ` - ${selectedListing.review.body}` : ''}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="empty-state empty-state--detail">
+                        <h3>No review yet</h3>
+                        <p>The buyer has not left feedback for this sold item yet.</p>
+                      </div>
+                    )
+                  ) : null}
+
                   {selectedListing.owner_id === user?.profileId ? (
                     <div className="empty-state empty-state--detail">
                       <h3>Read-only listing</h3>
                       <p>You can view it, but you cannot save, message, or buy your own post.</p>
+                    </div>
+                  ) : selectedListing.transactionStatus === 'sold' ? (
+                    <div className="empty-state empty-state--detail">
+                      <h3>Sold listing</h3>
+                      <p>This post has been finalized and is no longer available for purchase.</p>
                     </div>
                   ) : selectedListing.transactionStatus === 'available' ? (
                     <div className="message-box">

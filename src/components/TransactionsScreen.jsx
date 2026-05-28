@@ -13,6 +13,9 @@ export default function TransactionsScreen({
   onAcknowledgeTransaction,
   onFinalizeTransaction,
   onCancelTransaction,
+  reviewForm,
+  setReviewForm,
+  onSubmitReview,
   onDeleteListing,
   statusMessage,
   sidebarCards,
@@ -260,7 +263,7 @@ export default function TransactionsScreen({
                       </span>
                     ) : null}
 
-                    {selectedTransaction.status === 'completed' ? (
+                    {selectedTransaction.status === 'completed' && activeRole === 'seller' ? (
                       <button
                         type="button"
                         className="button button--yellow"
@@ -268,6 +271,73 @@ export default function TransactionsScreen({
                       >
                         Delete post
                       </button>
+                    ) : null}
+
+                    {selectedTransaction.status === 'completed' && activeRole === 'buyer' ? (
+                      <div className="review-module">
+                        {selectedTransaction.review ? (
+                          <div className="empty-state empty-state--thread">
+                            <h3>Review submitted</h3>
+                            <p>
+                              {selectedTransaction.review.rating}/5 stars
+                              {selectedTransaction.review.body
+                                ? ` - ${selectedTransaction.review.body}`
+                                : ''}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="review-module__form">
+                            <div className="review-module__header">
+                              <h3>Leave a review</h3>
+                              <p>Rate the transaction and share a quick note for the seller.</p>
+                            </div>
+
+                            <label className="input-group">
+                              <span>Rating</span>
+                              <select
+                                className="input"
+                                value={reviewForm?.rating ?? 5}
+                                onChange={(event) =>
+                                  setReviewForm((current) => ({
+                                    ...current,
+                                    rating: Number(event.target.value),
+                                  }))
+                                }
+                              >
+                                <option value="5">5 stars</option>
+                                <option value="4">4 stars</option>
+                                <option value="3">3 stars</option>
+                                <option value="2">2 stars</option>
+                                <option value="1">1 star</option>
+                              </select>
+                            </label>
+
+                            <label className="input-group">
+                              <span>Text review</span>
+                              <textarea
+                                className="textarea"
+                                rows={4}
+                                value={reviewForm?.body ?? ''}
+                                onChange={(event) =>
+                                  setReviewForm((current) => ({
+                                    ...current,
+                                    body: event.target.value,
+                                  }))
+                                }
+                                placeholder="Tell the seller what went well or what could improve."
+                              />
+                            </label>
+
+                            <button
+                              type="button"
+                              className="button button--primary"
+                              onClick={() => onSubmitReview(selectedTransaction)}
+                            >
+                              Submit Review
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     ) : null}
                   </div>
                 </div>

@@ -21,6 +21,8 @@ import {
   deleteConversationMessages,
   fetchUserMessages,
   fetchTransactions,
+  fetchReviewsByTransactionIds,
+  fetchReviewsByListingIds,
   fetchProfilesByIds,
   fetchProfileByAuthUserId,
   createProfile,
@@ -28,10 +30,12 @@ import {
   insertFavorite,
   insertListing,
   insertTransaction,
+  insertReview,
   insertMessage,
   insertListingMedia,
   mapListingRow,
   mapTransactionRow,
+  mapReviewRow,
   getPendingProfile,
   saveSession,
   savePendingProfile,
@@ -108,6 +112,7 @@ function App() {
   const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false)
   const [confirmation, setConfirmation] = useState(null)
   const [listingMediaFiles, setListingMediaFiles] = useState([])
+  const [reviewForm, setReviewForm] = useState({ rating: 5, body: '' })
 
   const { navigate, visibleRoute } = useBrowserRoute(Boolean(authenticatedUser))
 
@@ -250,13 +255,27 @@ function App() {
       ])
 
       const mappedListings = listingRows.map(mapListingRow)
-      const mappedTransactions = await enrichTransactions(session.accessToken, transactionRows, mappedListings)
+      const listingReviews =
+        mappedListings.length > 0
+          ? await fetchReviewsByListingIds(
+              session.accessToken,
+              mappedListings.map((listing) => listing.id),
+            )
+          : []
+      const listingReviewMap = new Map(listingReviews.map((review) => [review.listing_id, review]))
+      const listingsWithReviews = mappedListings.map((listing) => ({
+        ...listing,
+        review: listingReviewMap.get(listing.id)
+          ? mapReviewRow(listingReviewMap.get(listing.id))
+          : null,
+      }))
+      const mappedTransactions = await enrichTransactions(session.accessToken, transactionRows, listingsWithReviews)
       const activeSession = createSavedSession(session, profile)
       const activeUser = buildActiveUser(session, profile)
       saveSession(activeSession)
       setAuthenticatedUser(activeUser)
-      setListings(mappedListings)
-      setSelectedListing(mappedListings[0] || null)
+      setListings(listingsWithReviews)
+      setSelectedListing(listingsWithReviews[0] || null)
       setFavorites(favoriteIds)
       setTransactions(mappedTransactions)
       setSelectedTransaction(mappedTransactions[0] || null)
@@ -272,11 +291,12 @@ function App() {
 
     return listings.filter((listing) => {
       const isLockedListing = ['pending', 'ongoing', 'finalizing'].includes(listing.transactionStatus)
+      const isSoldListing = listing.transactionStatus === 'sold'
       const isParticipant =
         authenticatedUser &&
         (listing.activeBuyerId === authenticatedUser.profileId ||
           listing.activeSellerId === authenticatedUser.profileId)
-      const canSeeListing = listing.transactionStatus !== 'sold' && (!isLockedListing || isParticipant)
+      const canSeeListing = isSoldListing || (!isLockedListing || isParticipant)
       const matchesSearch =
         !query ||
         [listing.title, listing.category, listing.seller, listing.description]
@@ -437,6 +457,31 @@ function App() {
       setSelectedTransaction(transactions[0] || null)
     }
   }, [authenticatedUser, selectedTransaction, transactions, visibleRoute])
+
+  useEffect(() => {
+    if (!authenticatedUser || visibleRoute !== '/transactions' || !selectedTransaction) {
+      setReviewForm({ rating: 5, body: '' })
+      return
+    }
+
+    if (selectedTransaction.review && selectedTransaction.buyerId === authenticatedUser.profileId) {
+      setReviewForm({
+        rating: Number(selectedTransaction.review.rating || 5),
+        body: selectedTransaction.review.body || '',
+      })
+      return
+    }
+
+    if (
+      selectedTransaction.status === 'completed' &&
+      selectedTransaction.buyerId === authenticatedUser.profileId
+    ) {
+      setReviewForm({ rating: 5, body: '' })
+      return
+    }
+
+    setReviewForm({ rating: 5, body: '' })
+  }, [authenticatedUser, selectedTransaction, visibleRoute])
 
   function openConversationFromListing(listing, initialDraft = '') {
     if (!authenticatedUser || !listing) return
@@ -638,8 +683,8 @@ function App() {
         ...inserted,
         listing_media: mediaRows,
       })
-      setListings((current) => [mapped, ...current])
-      setSelectedListing(mapped)
+      setListings((current) => [{ ...mapped, review: null }, ...current])
+      setSelectedListing({ ...mapped, review: null })
       setForm(emptyListingForm)
       setListingMediaFiles([])
       setStatusMessage(
@@ -661,15 +706,24 @@ function App() {
       new Set(transactionRows.flatMap((row) => [row.buyer_id, row.seller_id]).filter(Boolean)),
     )
     const profileRows = participantIds.length > 0 ? await fetchProfilesByIds(token, participantIds) : []
+    const reviewRows =
+      transactionRows.length > 0
+        ? await fetchReviewsByTransactionIds(
+            token,
+            transactionRows.map((row) => row.id),
+          )
+        : []
 
     const listingMap = new Map(sourceListings.map((listing) => [listing.id, listing]))
     const profileMap = new Map(profileRows.map((profile) => [profile.id, profile]))
+    const reviewMap = new Map(reviewRows.map((review) => [review.transaction_id, review]))
 
     return transactionRows.map((row) => ({
       ...mapTransactionRow(row),
       listing: listingMap.get(row.listing_id) || null,
       buyer: profileMap.get(row.buyer_id) || null,
       seller: profileMap.get(row.seller_id) || null,
+      review: reviewMap.get(row.id) ? mapReviewRow(reviewMap.get(row.id)) : null,
     }))
   }
 
@@ -849,6 +903,59 @@ function App() {
     }
   }
 
+  async function submitReviewNow(transaction) {
+    if (!authenticatedUser || !transaction) return
+    if (transaction.buyerId !== authenticatedUser.profileId) {
+      setStatusMessage('Only the buyer can leave a review.')
+      return
+    }
+    if (transaction.status !== 'completed') {
+      setStatusMessage('You can only review after the transaction is completed.')
+      return
+    }
+    if (transaction.review) {
+      setStatusMessage('A review has already been submitted for this transaction.')
+      return
+    }
+
+    const rating = Math.max(1, Math.min(5, Number(reviewForm.rating || 5)))
+    const body = reviewForm.body.trim()
+
+    try {
+      setLoadingAction(true)
+      const review = await insertReview(authenticatedUser.accessToken, {
+        transaction_id: transaction.id,
+        listing_id: transaction.listingId,
+        reviewer_id: authenticatedUser.profileId,
+        reviewee_id: transaction.sellerId,
+        rating,
+        body,
+      })
+
+      await refreshTransactions()
+      setListings((current) =>
+        current.map((listing) =>
+          listing.id === transaction.listingId
+            ? {
+                ...listing,
+                review: mapReviewRow(review),
+              }
+            : listing,
+        ),
+      )
+      setSelectedTransaction((current) =>
+        current && current.id === transaction.id
+          ? { ...current, review: mapReviewRow(review) }
+          : current,
+      )
+      setStatusMessage('Review submitted. Thanks for sharing your feedback.')
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not submit the review.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
   async function cancelTransactionNow(transaction) {
     if (!authenticatedUser || !transaction) return
 
@@ -878,6 +985,10 @@ function App() {
 
   async function deleteListingNow(listing) {
     if (!authenticatedUser || !listing) return
+    if (listing.owner_id !== authenticatedUser.profileId) {
+      setStatusMessage('Only the seller can delete this post.')
+      return
+    }
 
     try {
       setLoadingAction(true)
@@ -1310,6 +1421,9 @@ function App() {
           onAcknowledgeTransaction={acknowledgeTransactionNow}
           onFinalizeTransaction={finalizeTransactionNow}
           onCancelTransaction={cancelTransactionNow}
+          reviewForm={reviewForm}
+          setReviewForm={setReviewForm}
+          onSubmitReview={submitReviewNow}
           onDeleteListing={(listing) => {
             if (!listing) return
 

@@ -134,6 +134,18 @@ create table if not exists public.transactions (
   check (status in ('pending', 'ongoing', 'finalizing', 'completed', 'cancelled'))
 );
 
+create table if not exists public.reviews (
+  id uuid primary key default gen_random_uuid(),
+  transaction_id uuid references public.transactions(id) on delete cascade unique,
+  listing_id uuid references public.listings(id) on delete cascade,
+  reviewer_id uuid references public.profiles(id) on delete cascade,
+  reviewee_id uuid references public.profiles(id) on delete cascade,
+  rating integer not null,
+  body text not null default '',
+  created_at timestamptz not null default now(),
+  check (rating between 1 and 5)
+);
+
 alter table public.transactions
   add column if not exists created_at timestamptz not null default now();
 
@@ -153,12 +165,23 @@ alter table public.transactions
   add constraint transactions_status_check
   check (status in ('pending', 'ongoing', 'finalizing', 'completed', 'cancelled')) not valid;
 
+alter table public.reviews
+  add column if not exists created_at timestamptz not null default now();
+
+alter table public.reviews
+  drop constraint if exists reviews_rating_check;
+
+alter table public.reviews
+  add constraint reviews_rating_check
+  check (rating between 1 and 5) not valid;
+
 alter table public.profiles enable row level security;
 alter table public.listings enable row level security;
 alter table public.listing_media enable row level security;
 alter table public.favorites enable row level security;
 alter table public.messages enable row level security;
 alter table public.transactions enable row level security;
+alter table public.reviews enable row level security;
 
 drop policy if exists "profiles are readable by authenticated users" on public.profiles;
 create policy "profiles are readable by authenticated users"
@@ -396,6 +419,44 @@ using (
     select 1 from public.profiles
     where profiles.id = transactions.seller_id
     and profiles.auth_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "reviews readable by participants" on public.reviews;
+create policy "reviews readable by participants"
+on public.reviews for select
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = reviews.reviewer_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.profiles
+    where profiles.id = reviews.reviewee_id
+    and profiles.auth_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "reviews insertable by buyers" on public.reviews;
+create policy "reviews insertable by buyers"
+on public.reviews for insert
+to authenticated
+with check (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = reviews.reviewer_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  and exists (
+    select 1
+    from public.transactions
+    where transactions.id = reviews.transaction_id
+    and transactions.status = 'completed'
+    and transactions.buyer_id = reviews.reviewer_id
+    and transactions.seller_id = reviews.reviewee_id
+    and transactions.listing_id = reviews.listing_id
   )
 );
 

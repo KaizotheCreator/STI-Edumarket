@@ -453,6 +453,40 @@ export async function deleteTransaction(token, transactionId) {
   })
 }
 
+export async function fetchReviewsByTransactionIds(token, transactionIds) {
+  const uniqueIds = Array.from(new Set((transactionIds || []).filter(Boolean)))
+  if (uniqueIds.length === 0) return []
+
+  const data = await request(
+    `/rest/v1/reviews?select=*&transaction_id=in.(${uniqueIds.join(',')})&order=created_at.desc`,
+    { token },
+  )
+
+  return Array.isArray(data) ? data : []
+}
+
+export async function fetchReviewsByListingIds(token, listingIds) {
+  const uniqueIds = Array.from(new Set((listingIds || []).filter(Boolean)))
+  if (uniqueIds.length === 0) return []
+
+  const data = await request(
+    `/rest/v1/reviews?select=*&listing_id=in.(${uniqueIds.join(',')})&order=created_at.desc`,
+    { token },
+  )
+
+  return Array.isArray(data) ? data : []
+}
+
+export async function insertReview(token, review) {
+  const data = await request('/rest/v1/reviews', {
+    method: 'POST',
+    token,
+    body: review,
+  })
+
+  return Array.isArray(data) ? data[0] : data
+}
+
 export async function fetchUserMessages(token, authUserId) {
   const data = await request(
     `/rest/v1/messages?select=*&or=(sender_id.eq.${authUserId},receiver_id.eq.${authUserId})&order=created_at.desc`,
@@ -543,5 +577,18 @@ export function mapTransactionRow(row) {
     listing: row.listing ? mapListingRow(row.listing) : null,
     buyer: row.buyer || null,
     seller: row.seller || null,
+  }
+}
+
+export function mapReviewRow(row) {
+  return {
+    id: row.id,
+    transactionId: row.transaction_id,
+    listingId: row.listing_id,
+    reviewerId: row.reviewer_id,
+    revieweeId: row.reviewee_id,
+    rating: Number(row.rating || 0),
+    body: row.body || '',
+    createdAt: row.created_at,
   }
 }
