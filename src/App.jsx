@@ -250,7 +250,7 @@ function App() {
       ])
 
       const mappedListings = listingRows.map(mapListingRow)
-      const mappedTransactions = transactionRows.map(mapTransactionRow)
+      const mappedTransactions = await enrichTransactions(session.accessToken, transactionRows, mappedListings)
       const activeSession = createSavedSession(session, profile)
       const activeUser = buildActiveUser(session, profile)
       saveSession(activeSession)
@@ -655,6 +655,24 @@ function App() {
     }
   }
 
+  async function enrichTransactions(token, rows, sourceListings = listings) {
+    const transactionRows = Array.isArray(rows) ? rows : []
+    const participantIds = Array.from(
+      new Set(transactionRows.flatMap((row) => [row.buyer_id, row.seller_id]).filter(Boolean)),
+    )
+    const profileRows = participantIds.length > 0 ? await fetchProfilesByIds(token, participantIds) : []
+
+    const listingMap = new Map(sourceListings.map((listing) => [listing.id, listing]))
+    const profileMap = new Map(profileRows.map((profile) => [profile.id, profile]))
+
+    return transactionRows.map((row) => ({
+      ...mapTransactionRow(row),
+      listing: listingMap.get(row.listing_id) || null,
+      buyer: profileMap.get(row.buyer_id) || null,
+      seller: profileMap.get(row.seller_id) || null,
+    }))
+  }
+
   function updateListingLocal(listingId, patch) {
     setListings((current) =>
       current.map((listing) => (listing.id === listingId ? { ...listing, ...patch } : listing)),
@@ -668,7 +686,7 @@ function App() {
     if (!authenticatedUser) return []
 
     const rows = await fetchTransactions(authenticatedUser.accessToken, authenticatedUser.profileId)
-    const mapped = rows.map(mapTransactionRow)
+    const mapped = await enrichTransactions(authenticatedUser.accessToken, rows)
 
     setTransactions(mapped)
     setSelectedTransaction((current) => {

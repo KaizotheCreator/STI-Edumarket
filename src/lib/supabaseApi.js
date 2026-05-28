@@ -419,7 +419,7 @@ export async function deleteListing(token, listingId) {
 
 export async function fetchTransactions(token, profileId) {
   const data = await request(
-    `/rest/v1/transactions?select=*,listing:listing_id(*,listing_media(*)),buyer:buyer_id(id,full_name,student_number,section),seller:seller_id(id,full_name,student_number,section)&or=(buyer_id.eq.${profileId},seller_id.eq.${profileId})&order=updated_at.desc`,
+    `/rest/v1/transactions?select=*&or=(buyer_id.eq.${profileId},seller_id.eq.${profileId})&order=updated_at.desc`,
     { token },
   )
 
