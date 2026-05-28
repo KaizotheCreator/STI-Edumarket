@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 const authRoutes = new Set(['/login', '/signup'])
-const protectedRoutes = new Set(['/marketplace', '/profile', '/post-item', '/messages'])
+const protectedRoutes = new Set(['/marketplace', '/profile', '/post-item', '/messages', '/transactions'])
 
 export function normalizeRoute(pathname) {
   if (!pathname || pathname === '/') return '/login'
