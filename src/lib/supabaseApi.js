@@ -418,6 +418,13 @@ export async function fetchConversationMessages(token, listingId, participantA, 
   return Array.isArray(data) ? data : []
 }
 
+export async function deleteConversationMessages(token, listingId, participantA, participantB) {
+  await request(
+    `/rest/v1/messages?listing_id=eq.${listingId}&or=(and(sender_id.eq.${participantA},receiver_id.eq.${participantB}),and(sender_id.eq.${participantB},receiver_id.eq.${participantA}))`,
+    { method: 'DELETE', token },
+  )
+}
+
 export async function fetchProfilesByIds(token, ids) {
   const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)))
   if (uniqueIds.length === 0) return []

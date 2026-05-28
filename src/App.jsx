@@ -15,6 +15,7 @@ import {
   fetchFavorites,
   fetchListings,
   fetchConversationMessages,
+  deleteConversationMessages,
   fetchUserMessages,
   fetchProfilesByIds,
   fetchProfileByAuthUserId,
@@ -741,6 +742,30 @@ function App() {
     }
   }
 
+  async function deleteConversationNow(conversation) {
+    if (!authenticatedUser || !conversation) return
+
+    try {
+      setLoadingAction(true)
+      await deleteConversationMessages(
+        authenticatedUser.accessToken,
+        conversation.listingId,
+        authenticatedUser.profileId,
+        conversation.otherProfileId,
+      )
+
+      setConversations((current) => current.filter((item) => item.key !== conversation.key))
+      setThreadMessages([])
+      setSelectedConversation(null)
+      setThreadDraft('')
+      setStatusMessage('Conversation deleted.')
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not delete the conversation.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
   function sendMessage() {
     if (!authenticatedUser || !messageDraft.trim() || !selectedListing) return
 
@@ -830,6 +855,11 @@ function App() {
           '',
         )
       }
+      return
+    }
+
+    if (currentConfirmation.action === 'deleteConversation') {
+      await deleteConversationNow(currentConfirmation.payload.conversation)
       return
     }
   }
@@ -938,9 +968,32 @@ function App() {
               body: threadDraft.trim(),
             })
           }}
+          onDeleteConversation={() => {
+            if (!selectedConversation) return
+
+            requestConfirmation(
+              'deleteConversation',
+              { conversation: selectedConversation },
+              {
+                title: 'Delete this conversation?',
+                message:
+                  'This will permanently delete the whole message thread for both people.',
+                confirmLabel: 'Delete',
+              },
+            )
+          }}
           loadingMessage={conversationLoading}
           statusMessage={statusMessage}
           sidebarCards={sidebarCards}
+        />
+        <ConfirmModal
+          open={Boolean(confirmation)}
+          title={confirmation?.title || ''}
+          message={confirmation?.message || ''}
+          confirmLabel={confirmation?.confirmLabel || 'Confirm'}
+          cancelLabel="Cancel"
+          onConfirm={handleConfirmedAction}
+          onCancel={clearConfirmation}
         />
       </>
     )

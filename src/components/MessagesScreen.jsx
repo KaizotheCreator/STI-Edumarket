@@ -13,6 +13,7 @@ export default function MessagesScreen({
   setDraft,
   onSelectConversation,
   onSend,
+  onDeleteConversation,
   loadingMessage,
   statusMessage,
   sidebarCards,
@@ -84,9 +85,18 @@ export default function MessagesScreen({
                   <div className="messages-card__feed">
                     <div className="messages-card__feed-head">
                       <span className="pill pill--blue">Private thread</span>
-                      <span className="messages-card__status">
-                        {loadingMessage ? 'Loading messages...' : `${messages.length} messages`}
-                      </span>
+                      <div className="messages-card__feed-actions">
+                        <span className="messages-card__status">
+                          {loadingMessage ? 'Loading messages...' : `${messages.length} messages`}
+                        </span>
+                        <button
+                          type="button"
+                          className="button button--ghost messages-card__delete"
+                          onClick={onDeleteConversation}
+                        >
+                          Delete Conversation
+                        </button>
+                      </div>
                     </div>
 
                     <div className="message-thread__items">

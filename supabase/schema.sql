@@ -245,6 +245,23 @@ with check (
   )
 );
 
+drop policy if exists "messages deletable by participants" on public.messages;
+create policy "messages deletable by participants"
+on public.messages for delete
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = messages.sender_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.profiles
+    where profiles.id = messages.receiver_id
+    and profiles.auth_user_id = auth.uid()
+  )
+);
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
