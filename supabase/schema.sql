@@ -140,6 +140,12 @@ alter table public.transactions
 alter table public.transactions
   add column if not exists updated_at timestamptz not null default now();
 
+alter table public.transactions
+  add column if not exists buyer_acknowledged boolean not null default false;
+
+alter table public.transactions
+  add column if not exists seller_acknowledged boolean not null default false;
+
 alter table public.profiles enable row level security;
 alter table public.listings enable row level security;
 alter table public.listing_media enable row level security;
