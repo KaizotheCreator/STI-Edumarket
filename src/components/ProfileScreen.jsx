@@ -75,7 +75,7 @@ export default function ProfileScreen({
             {ownedListings.length > 0 ? (
               <div className="grid">
                 {ownedListings.map((listing) => (
-                  <article className="card card--profile-post" key={listing.id}>
+                  <article className="card card--profile-post card--owned" key={listing.id} aria-disabled="true">
                     {listing.media?.[0] ? (
                       <div className="card__media">
                         {listing.media[0].mediaType === 'video' ? (
@@ -90,6 +90,7 @@ export default function ProfileScreen({
                       <span className={`pill ${listing.free ? 'pill--yellow' : 'pill--blue'}`}>
                         {listing.free ? 'Free' : `PHP ${listing.price}`}
                       </span>
+                      <span className="pill pill--blue">Your post</span>
                     </div>
 
                     <h3>{listing.title}</h3>
@@ -99,6 +100,7 @@ export default function ProfileScreen({
                       <span>Category: {listing.category}</span>
                       <span>Meet-up: {listing.location}</span>
                       <span>Condition: {listing.condition}</span>
+                      <span>Read-only listing</span>
                     </div>
                   </article>
                 ))}

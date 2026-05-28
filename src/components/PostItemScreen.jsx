@@ -46,8 +46,8 @@ export default function PostItemScreen({
           </div>
 
           <div className="hero__panel">
-            <div className="panel-card">
-              <span className="pill pill--blue">Ready to post</span>
+            <div className="panel-card panel-card--profile">
+              <span className="pill pill--yellow">Ready to post</span>
               <h2>Your listing will appear in the marketplace feed.</h2>
               <ul>
                 <li>Use clear titles</li>

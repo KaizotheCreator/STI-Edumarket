@@ -352,6 +352,16 @@ export async function insertListing(token, listing) {
   return Array.isArray(data) ? data[0] : data
 }
 
+export async function updateListing(token, listingId, patch) {
+  const data = await request(`/rest/v1/listings?id=eq.${listingId}`, {
+    method: 'PATCH',
+    token,
+    body: patch,
+  })
+
+  return Array.isArray(data) ? data[0] : data
+}
+
 export async function insertListingMedia(token, mediaRows) {
   if (!Array.isArray(mediaRows) || mediaRows.length === 0) return []
 
@@ -397,6 +407,49 @@ export async function insertMessage(token, message) {
     method: 'POST',
     token,
     body: message,
+  })
+}
+
+export async function deleteListing(token, listingId) {
+  await request(`/rest/v1/listings?id=eq.${listingId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export async function fetchTransactions(token, profileId) {
+  const data = await request(
+    `/rest/v1/transactions?select=*,listing:listing_id(*,listing_media(*)),buyer:buyer_id(id,full_name,student_number,section),seller:seller_id(id,full_name,student_number,section)&or=(buyer_id.eq.${profileId},seller_id.eq.${profileId})&order=updated_at.desc`,
+    { token },
+  )
+
+  return Array.isArray(data) ? data : []
+}
+
+export async function insertTransaction(token, transaction) {
+  const data = await request('/rest/v1/transactions', {
+    method: 'POST',
+    token,
+    body: transaction,
+  })
+
+  return Array.isArray(data) ? data[0] : data
+}
+
+export async function updateTransaction(token, transactionId, patch) {
+  const data = await request(`/rest/v1/transactions?id=eq.${transactionId}`, {
+    method: 'PATCH',
+    token,
+    body: patch,
+  })
+
+  return Array.isArray(data) ? data[0] : data
+}
+
+export async function deleteTransaction(token, transactionId) {
+  await request(`/rest/v1/transactions?id=eq.${transactionId}`, {
+    method: 'DELETE',
+    token,
   })
 }
 
@@ -456,6 +509,9 @@ export function mapListingRow(row) {
     description: row.description,
     free: Boolean(row.is_free || Number(row.price || 0) === 0),
     owner_id: row.owner_id,
+    transactionStatus: row.transaction_status || 'available',
+    activeBuyerId: row.active_buyer_id || null,
+    activeSellerId: row.active_seller_id || null,
     created_at: row.created_at,
     media: mediaRows.map((item) => ({
       id: item.id,
@@ -468,5 +524,24 @@ export function mapListingRow(row) {
       sortOrder: item.sort_order,
       createdAt: item.created_at,
     })),
+  }
+}
+
+export function mapTransactionRow(row) {
+  return {
+    id: row.id,
+    listingId: row.listing_id,
+    buyerId: row.buyer_id,
+    sellerId: row.seller_id,
+    agreedPrice: Number(row.agreed_price || 0),
+    status: row.status || 'pending',
+    buyerAcknowledged: Boolean(row.buyer_acknowledged),
+    sellerAcknowledged: Boolean(row.seller_acknowledged),
+    note: row.note || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || row.created_at,
+    listing: row.listing ? mapListingRow(row.listing) : null,
+    buyer: row.buyer || null,
+    seller: row.seller || null,
   }
 }

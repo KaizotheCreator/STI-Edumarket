@@ -121,13 +121,14 @@ textarea {
 }
 
 .app-sidebar__nav .nav-pill--logout {
-  background: rgba(220, 38, 38, 0.14);
-  color: #991b1b;
-  border-color: rgba(220, 38, 38, 0.25);
+  background: #dc2626;
+  color: var(--white);
+  border-color: #b91c1c;
+  box-shadow: 0 12px 24px rgba(220, 38, 38, 0.2);
 }
 
 .app-sidebar__nav .nav-pill--logout:hover {
-  background: rgba(220, 38, 38, 0.2);
+  background: #b91c1c;
 }
 
 .app-sidebar__cards .stat-card {
@@ -259,6 +260,14 @@ textarea {
   text-overflow: ellipsis;
 }
 
+.transaction-item {
+  gap: 0.25rem;
+}
+
+.transaction-item strong {
+  display: block;
+}
+
 .conversation-item--active {
   border-color: rgba(29, 78, 216, 0.28);
   background: rgba(29, 78, 216, 0.07);
@@ -355,6 +364,31 @@ textarea {
   display: grid;
   place-items: center;
   text-align: center;
+}
+
+.transactions-card {
+  display: block;
+  padding: 1.1rem;
+}
+
+.transactions-card__body {
+  display: grid;
+  gap: 1rem;
+}
+
+.transactions-card__title {
+  margin: 0;
+  color: var(--blue-900);
+  font-size: clamp(1.7rem, 2.8vw, 2.3rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.transaction-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .auth-shell {
@@ -610,7 +644,9 @@ textarea {
 }
 
 .nav-pill--logout {
-  background: rgba(234, 179, 8, 0.16);
+  background: #dc2626;
+  color: var(--white);
+  border-color: #b91c1c;
 }
 
 .user-chip--compact {
@@ -810,6 +846,11 @@ textarea {
   color: #854d0e;
 }
 
+.pill--gray {
+  background: rgba(148, 163, 184, 0.2);
+  color: #334155;
+}
+
 .content {
   display: grid;
   gap: 1.5rem;
@@ -969,14 +1010,32 @@ textarea {
   gap: 0.7rem;
 }
 
+.card--owned {
+  position: relative;
+  border-color: rgba(29, 78, 216, 0.18);
+  background: linear-gradient(180deg, rgba(29, 78, 216, 0.04), rgba(255, 255, 255, 0.96));
+}
+
 .card--profile-post .card__media {
   min-height: 82px;
   border-radius: 16px;
 }
 
+.card--owned .card__media {
+  opacity: 0.92;
+}
+
 .card--profile-post h3 {
   margin: 0.2rem 0 0.15rem;
   font-size: 0.98rem;
+}
+
+.card--owned .meta {
+  opacity: 0.9;
+}
+
+.card--owned .card__top .pill {
+  padding-right: 2rem;
 }
 
 .card--profile-post p {
@@ -1094,6 +1153,10 @@ textarea {
   gap: 0.6rem;
   margin: 1rem 0;
   max-width: 520px;
+}
+
+.listing-media--compact {
+  max-width: 420px;
 }
 
 .listing-media__item {

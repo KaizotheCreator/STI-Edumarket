@@ -23,6 +23,8 @@ export default function MarketplaceScreen({
   messageDraft,
   setMessageDraft,
   sendMessage,
+  onStartTransaction,
+  onOpenTransactions,
   navigate,
   logout,
   sidebarCards,
@@ -49,8 +51,8 @@ export default function MarketplaceScreen({
           </div>
 
           <div className="hero__panel">
-            <div className="panel-card">
-              <span className="pill pill--blue">Verified accounts</span>
+            <div className="panel-card panel-card--profile">
+              <span className="pill pill--yellow">Verified accounts</span>
               <h2>Built for campus trust and convenience</h2>
               <ul>
                 <li>School-only marketplace</li>
@@ -106,61 +108,87 @@ export default function MarketplaceScreen({
             {visibleListings.length > 0 ? (
               <>
                 <div className="grid grid--stacked">
-                  {paginatedVisibleListings.map((listing) => (
-                    <article
-                      className={`card card--horizontal ${
-                        selectedListing?.id === listing.id ? 'card--selected' : ''
-                      } ${preferredItems.includes(listing.category) ? 'card--preferred' : ''}`}
-                      key={listing.id}
-                      onClick={() => setSelectedListing(listing)}
-                    >
-                      <div className="card__body">
-                        <div className="card__top">
-                          <span className={`pill ${listing.free ? 'pill--yellow' : 'pill--blue'}`}>
-                            {listing.free ? 'Free' : `PHP ${listing.price}`}
-                          </span>
-                          {preferredItems.includes(listing.category) ? (
-                            <span className="pill pill--yellow card__badge">Recommended</span>
-                          ) : null}
-                        </div>
+                  {paginatedVisibleListings.map((listing) => {
+                    const isOwnListing = listing.owner_id === user?.profileId
+                    const isLockedListing = ['pending', 'ongoing', 'finalizing'].includes(
+                      listing.transactionStatus,
+                    )
+                    const isParticipant =
+                      listing.activeBuyerId === user?.profileId ||
+                      listing.activeSellerId === user?.profileId
 
-                        <h3>{listing.title}</h3>
-                        <p>{listing.description}</p>
-
-                        <div className="meta">
-                          <span>Category: {listing.category}</span>
-                          <span>{listing.condition}</span>
-                          <span>Meet-up location: {listing.location}</span>
-                        </div>
-                      </div>
-
-                      <div className="card__side">
-                        <button
-                          className="icon-button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            toggleFavorite(listing.id)
-                          }}
-                          type="button"
-                          aria-label="Toggle favorite"
-                        >
-                          {favorites.includes(listing.id) ? 'Saved' : 'Save'}
-                        </button>
-
-                        {listing.media?.[0] ? (
-                          <div className="card__media">
-                            {listing.media[0].mediaType === 'video' ? (
-                              <video src={listing.media[0].publicUrl} muted />
-                            ) : (
-                              <img src={listing.media[0].publicUrl} alt="" />
-                            )}
+                    return (
+                      <article
+                        className={`card card--horizontal ${
+                          selectedListing?.id === listing.id ? 'card--selected' : ''
+                        } ${preferredItems.includes(listing.category) ? 'card--preferred' : ''} ${
+                          isOwnListing ? 'card--owned' : ''
+                        }`}
+                        key={listing.id}
+                        onClick={() => setSelectedListing(listing)}
+                      >
+                        <div className="card__body">
+                          <div className="card__top">
+                            <span className={`pill ${listing.free ? 'pill--yellow' : 'pill--blue'}`}>
+                              {listing.free ? 'Free' : `PHP ${listing.price}`}
+                            </span>
+                            {preferredItems.includes(listing.category) ? (
+                              <span className="pill pill--yellow card__badge">Recommended</span>
+                            ) : null}
+                            {isLockedListing && isParticipant ? (
+                              <span className="pill pill--yellow card__badge">Ongoing process</span>
+                            ) : null}
+                            {isOwnListing ? (
+                              <span className="pill pill--blue card__badge">Your post</span>
+                            ) : null}
                           </div>
-                        ) : (
-                          <div className="card__media card__media--empty" />
-                        )}
-                      </div>
-                    </article>
-                  ))}
+
+                          <h3>{listing.title}</h3>
+                          <p>{listing.description}</p>
+
+                          <div className="meta">
+                            <span>Category: {listing.category}</span>
+                            <span>{listing.condition}</span>
+                            <span>Meet-up location: {listing.location}</span>
+                          </div>
+                        </div>
+
+                        <div className="card__side">
+                          {!isOwnListing ? (
+                            <button
+                              className="icon-button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                toggleFavorite(listing.id)
+                              }}
+                              type="button"
+                              aria-label="Toggle favorite"
+                            >
+                              {favorites.includes(listing.id) ? 'Saved' : 'Save'}
+                            </button>
+                          ) : null}
+
+                          {isLockedListing && isParticipant ? (
+                            <span className="pill pill--yellow card__badge card__badge--owned">
+                              Ongoing
+                            </span>
+                          ) : null}
+
+                          {listing.media?.[0] ? (
+                            <div className="card__media">
+                              {listing.media[0].mediaType === 'video' ? (
+                                <video src={listing.media[0].publicUrl} muted />
+                              ) : (
+                                <img src={listing.media[0].publicUrl} alt="" />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="card__media card__media--empty" />
+                          )}
+                        </div>
+                      </article>
+                    )
+                  })}
                 </div>
 
                 <div className="pagination" aria-label="Marketplace pagination">
@@ -237,18 +265,49 @@ export default function MarketplaceScreen({
                     <Detail label="Type" value={selectedListing.type} />
                   </div>
 
-                  <div className="message-box">
-                    <textarea
-                      className="textarea"
-                      value={messageDraft}
-                      onChange={(event) => setMessageDraft(event.target.value)}
-                      placeholder="Write a message to the seller..."
-                      rows={4}
-                    />
-                    <button className="button button--primary" onClick={sendMessage} type="button">
-                      Send Message
-                    </button>
-                  </div>
+                  {selectedListing.owner_id === user?.profileId ? (
+                    <div className="empty-state empty-state--detail">
+                      <h3>Read-only listing</h3>
+                      <p>You can view it, but you cannot save, message, or buy your own post.</p>
+                    </div>
+                  ) : selectedListing.transactionStatus === 'available' ? (
+                    <div className="message-box">
+                      <textarea
+                        className="textarea"
+                        value={messageDraft}
+                        onChange={(event) => setMessageDraft(event.target.value)}
+                        placeholder="Write a message to the seller..."
+                        rows={4}
+                      />
+                      <div className="transaction-actions">
+                        <button className="button button--primary" onClick={sendMessage} type="button">
+                          Send Message
+                        </button>
+                        <button
+                          className="button button--ghost"
+                          onClick={() => onStartTransaction(selectedListing)}
+                          type="button"
+                        >
+                          Buy
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="empty-state empty-state--detail">
+                      <h3>Ongoing process</h3>
+                      <p>
+                        This listing is locked by an active transaction. Open your transactions
+                        module to continue the deal.
+                      </p>
+                      <button
+                        type="button"
+                        className="button button--ghost"
+                        onClick={onOpenTransactions}
+                      >
+                        Open Transactions
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="empty-state empty-state--detail">

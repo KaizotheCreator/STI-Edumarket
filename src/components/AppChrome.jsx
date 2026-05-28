@@ -74,6 +74,13 @@ export function AppSidebar({
         >
           Messages
         </button>
+        <button
+          type="button"
+          className={`nav-pill ${activeRoute === '/transactions' ? 'nav-pill--active' : ''}`}
+          onClick={() => navigate('/transactions')}
+        >
+          Transactions
+        </button>
         <button type="button" className="nav-pill nav-pill--logout" onClick={logout}>
           Logout
         </button>

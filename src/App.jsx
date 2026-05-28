@@ -5,6 +5,7 @@ import MarketplaceScreen from './components/MarketplaceScreen'
 import MessagesScreen from './components/MessagesScreen'
 import PostItemScreen from './components/PostItemScreen'
 import ProfileScreen from './components/ProfileScreen'
+import TransactionsScreen from './components/TransactionsScreen'
 import { emptyListingForm, emptyLoginForm, emptySignupForm, meetupLocations } from './data'
 import { useBrowserRoute } from './hooks/useBrowserRoute'
 import {
@@ -12,30 +13,37 @@ import {
   clearPendingProfile,
   createSavedSession,
   deleteFavorite,
+  deleteListing,
+  deleteTransaction,
   fetchFavorites,
   fetchListings,
   fetchConversationMessages,
   deleteConversationMessages,
   fetchUserMessages,
+  fetchTransactions,
   fetchProfilesByIds,
   fetchProfileByAuthUserId,
   createProfile,
   getSessionFromStorage,
   insertFavorite,
   insertListing,
+  insertTransaction,
   insertMessage,
   insertListingMedia,
   mapListingRow,
+  mapTransactionRow,
   getPendingProfile,
   saveSession,
   savePendingProfile,
   signInStudent,
   signUpStudent,
+  updateListing,
+  updateTransaction,
   uploadListingMediaFiles,
 } from './lib/supabaseApi'
 
 const authRoutes = new Set(['/login', '/signup'])
-const protectedRoutes = new Set(['/marketplace', '/profile', '/post-item', '/messages'])
+const protectedRoutes = new Set(['/marketplace', '/profile', '/post-item', '/messages', '/transactions'])
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -84,6 +92,8 @@ function App() {
   const [threadMessages, setThreadMessages] = useState([])
   const [conversations, setConversations] = useState([])
   const [selectedConversation, setSelectedConversation] = useState(null)
+  const [transactions, setTransactions] = useState([])
+  const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [conversationLoading, setConversationLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [authMessage, setAuthMessage] = useState('')
@@ -233,21 +243,23 @@ function App() {
 
       clearPendingProfile()
 
-      const [listingRows, favoriteIds] = await Promise.all([
+      const [listingRows, favoriteIds, transactionRows] = await Promise.all([
         fetchListings(session.accessToken),
         fetchFavorites(session.accessToken, profile.id),
+        fetchTransactions(session.accessToken, profile.id),
       ])
 
       const mappedListings = listingRows.map(mapListingRow)
+      const mappedTransactions = transactionRows.map(mapTransactionRow)
       const activeSession = createSavedSession(session, profile)
       const activeUser = buildActiveUser(session, profile)
-      const peerListings = mappedListings.filter((listing) => listing.owner_id !== profile.id)
-
       saveSession(activeSession)
       setAuthenticatedUser(activeUser)
       setListings(mappedListings)
-      setSelectedListing(peerListings[0] || null)
+      setSelectedListing(mappedListings[0] || null)
       setFavorites(favoriteIds)
+      setTransactions(mappedTransactions)
+      setSelectedTransaction(mappedTransactions[0] || null)
       setAuthMessage('')
       setStatusMessage('')
     } finally {
@@ -256,12 +268,15 @@ function App() {
   }
 
   const visibleListings = useMemo(() => {
-    const peerListings = authenticatedUser
-      ? listings.filter((listing) => listing.owner_id !== authenticatedUser.profileId)
-      : listings
     const query = search.trim().toLowerCase()
 
-    return peerListings.filter((listing) => {
+    return listings.filter((listing) => {
+      const isLockedListing = ['pending', 'ongoing', 'finalizing'].includes(listing.transactionStatus)
+      const isParticipant =
+        authenticatedUser &&
+        (listing.activeBuyerId === authenticatedUser.profileId ||
+          listing.activeSellerId === authenticatedUser.profileId)
+      const canSeeListing = listing.transactionStatus !== 'sold' && (!isLockedListing || isParticipant)
       const matchesSearch =
         !query ||
         [listing.title, listing.category, listing.seller, listing.description]
@@ -273,9 +288,9 @@ function App() {
 
       const matchesFree = !showFreeOnly || listing.free
 
-      return matchesSearch && matchesCategory && matchesFree
+      return canSeeListing && matchesSearch && matchesCategory && matchesFree
     })
-  }, [authenticatedUser, category, listings, search, showFreeOnly])
+  }, [category, listings, search, showFreeOnly])
 
   const marketplacePageSize = 6
   const marketplacePageCount = Math.max(1, Math.ceil(visibleListings.length / marketplacePageSize))
@@ -317,9 +332,10 @@ function App() {
     return [
       { label: 'Marketplace', value: visibleListings.length },
       { label: 'My Posts', value: ownedListingsCount },
+      { label: 'Transactions', value: transactions.length },
       { label: 'Favorites', value: favorites.length },
     ]
-  }, [authenticatedUser, favorites.length, listings, visibleListings.length])
+  }, [authenticatedUser, favorites.length, listings, transactions.length, visibleListings.length])
 
   const ownedListings = useMemo(() => {
     if (!authenticatedUser) return []
@@ -405,6 +421,22 @@ function App() {
       cancelled = true
     }
   }, [authenticatedUser, listings, selectedConversation?.key, visibleRoute])
+
+  useEffect(() => {
+    if (!authenticatedUser || visibleRoute !== '/transactions') return
+
+    if (!selectedTransaction && transactions.length > 0) {
+      setSelectedTransaction(transactions[0])
+      return
+    }
+
+    if (
+      selectedTransaction &&
+      !transactions.some((transaction) => transaction.id === selectedTransaction.id)
+    ) {
+      setSelectedTransaction(transactions[0] || null)
+    }
+  }, [authenticatedUser, selectedTransaction, transactions, visibleRoute])
 
   function openConversationFromListing(listing, initialDraft = '') {
     if (!authenticatedUser || !listing) return
@@ -623,6 +655,227 @@ function App() {
     }
   }
 
+  function updateListingLocal(listingId, patch) {
+    setListings((current) =>
+      current.map((listing) => (listing.id === listingId ? { ...listing, ...patch } : listing)),
+    )
+    setSelectedListing((current) =>
+      current && current.id === listingId ? { ...current, ...patch } : current,
+    )
+  }
+
+  async function refreshTransactions() {
+    if (!authenticatedUser) return []
+
+    const rows = await fetchTransactions(authenticatedUser.accessToken, authenticatedUser.profileId)
+    const mapped = rows.map(mapTransactionRow)
+
+    setTransactions(mapped)
+    setSelectedTransaction((current) => {
+      if (current) {
+        return mapped.find((transaction) => transaction.id === current.id) || mapped[0] || null
+      }
+
+      return mapped[0] || null
+    })
+
+    return mapped
+  }
+
+  async function startTransactionNow(listing) {
+    if (!authenticatedUser || !listing || listing.owner_id === authenticatedUser.profileId) return
+
+    const existingTransaction = transactions.find(
+      (transaction) =>
+        transaction.listingId === listing.id && transaction.status !== 'cancelled',
+    )
+
+    if (existingTransaction) {
+      setSelectedTransaction(existingTransaction)
+      navigate('/transactions')
+      setStatusMessage('That transaction is already open.')
+      return
+    }
+
+    try {
+      setLoadingAction(true)
+      const created = await insertTransaction(authenticatedUser.accessToken, {
+        listing_id: listing.id,
+        buyer_id: authenticatedUser.profileId,
+        seller_id: listing.owner_id,
+        agreed_price: listing.free ? 0 : Number(listing.price || 0),
+        status: 'pending',
+        buyer_acknowledged: false,
+        seller_acknowledged: false,
+        updated_at: new Date().toISOString(),
+      })
+
+      await updateListing(authenticatedUser.accessToken, listing.id, {
+        transaction_status: 'pending',
+        active_buyer_id: authenticatedUser.profileId,
+        active_seller_id: listing.owner_id,
+      })
+      updateListingLocal(listing.id, {
+        transactionStatus: 'pending',
+        activeBuyerId: authenticatedUser.profileId,
+        activeSellerId: listing.owner_id,
+      })
+
+      const refreshed = await refreshTransactions()
+      const nextTransaction =
+        refreshed.find(
+          (transaction) =>
+            transaction.listingId === listing.id &&
+            transaction.buyerId === authenticatedUser.profileId,
+        ) || mapTransactionRow(created)
+
+      setSelectedTransaction(nextTransaction)
+      navigate('/transactions')
+      setStatusMessage('Purchase started. Open the transaction to confirm the buy.')
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not start the transaction.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
+  async function commitPurchaseNow(transaction) {
+    if (!authenticatedUser || !transaction) return
+
+    try {
+      setLoadingAction(true)
+      const nextTransaction = await updateTransaction(authenticatedUser.accessToken, transaction.id, {
+        status: 'ongoing',
+        buyer_acknowledged: false,
+        seller_acknowledged: false,
+        updated_at: new Date().toISOString(),
+      })
+
+      await updateListing(authenticatedUser.accessToken, transaction.listingId, {
+        transaction_status: 'ongoing',
+      })
+      updateListingLocal(transaction.listingId, { transactionStatus: 'ongoing' })
+
+      await refreshTransactions()
+      setSelectedTransaction(mapTransactionRow(nextTransaction))
+      setStatusMessage('Purchase confirmed. Both sides can acknowledge the transaction now.')
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not update the transaction.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
+  async function acknowledgeTransactionNow(transaction) {
+    if (!authenticatedUser || !transaction) return
+
+    try {
+      setLoadingAction(true)
+      const isBuyer = transaction.buyerId === authenticatedUser.profileId
+      const isSeller = transaction.sellerId === authenticatedUser.profileId
+      const nextBuyerAck = isBuyer ? true : transaction.buyerAcknowledged
+      const nextSellerAck = isSeller ? true : transaction.sellerAcknowledged
+      const nextStatus = nextBuyerAck && nextSellerAck ? 'finalizing' : 'ongoing'
+      const nextTransaction = await updateTransaction(authenticatedUser.accessToken, transaction.id, {
+        buyer_acknowledged: nextBuyerAck,
+        seller_acknowledged: nextSellerAck,
+        status: nextStatus,
+        updated_at: new Date().toISOString(),
+      })
+
+      await updateListing(authenticatedUser.accessToken, transaction.listingId, {
+        transaction_status: nextStatus,
+      })
+      updateListingLocal(transaction.listingId, { transactionStatus: nextStatus })
+
+      await refreshTransactions()
+      setSelectedTransaction(mapTransactionRow(nextTransaction))
+      setStatusMessage(
+        nextStatus === 'finalizing'
+          ? 'Both sides acknowledged. Seller can now finalize the sale.'
+          : 'Acknowledgement saved.',
+      )
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not acknowledge the transaction.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
+  async function finalizeTransactionNow(transaction) {
+    if (!authenticatedUser || !transaction) return
+
+    try {
+      setLoadingAction(true)
+      const nextTransaction = await updateTransaction(authenticatedUser.accessToken, transaction.id, {
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+      })
+
+      await updateListing(authenticatedUser.accessToken, transaction.listingId, {
+        transaction_status: 'sold',
+      })
+      updateListingLocal(transaction.listingId, { transactionStatus: 'sold' })
+
+      await refreshTransactions()
+      setSelectedTransaction(mapTransactionRow(nextTransaction))
+      setStatusMessage('Transaction finalized. The item is marked as sold.')
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not finalize the transaction.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
+  async function cancelTransactionNow(transaction) {
+    if (!authenticatedUser || !transaction) return
+
+    try {
+      setLoadingAction(true)
+      await updateListing(authenticatedUser.accessToken, transaction.listingId, {
+        transaction_status: 'available',
+        active_buyer_id: null,
+        active_seller_id: null,
+      })
+      updateListingLocal(transaction.listingId, {
+        transactionStatus: 'available',
+        activeBuyerId: null,
+        activeSellerId: null,
+      })
+      const nextTransaction = transactions.find((item) => item.id !== transaction.id) || null
+      await deleteTransaction(authenticatedUser.accessToken, transaction.id)
+      setTransactions((current) => current.filter((item) => item.id !== transaction.id))
+      setSelectedTransaction((current) => (current?.id === transaction.id ? nextTransaction : current))
+      setStatusMessage('Transaction cancelled.')
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not cancel the transaction.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
+  async function deleteListingNow(listing) {
+    if (!authenticatedUser || !listing) return
+
+    try {
+      setLoadingAction(true)
+      await deleteListing(authenticatedUser.accessToken, listing.id)
+      setListings((current) => current.filter((item) => item.id !== listing.id))
+      setTransactions((current) => current.filter((transaction) => transaction.listingId !== listing.id))
+      if (selectedListing?.id === listing.id) {
+        setSelectedListing(null)
+      }
+      if (selectedTransaction?.listingId === listing.id) {
+        setSelectedTransaction(null)
+      }
+      setStatusMessage('Listing deleted.')
+    } catch (error) {
+      setStatusMessage(error.message || 'Could not delete the listing.')
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
   function handleSubmitListing(event) {
     event.preventDefault()
     if (!authenticatedUser) return
@@ -703,6 +956,10 @@ function App() {
 
   async function sendMessageNow(message) {
     if (!authenticatedUser) return
+    if (selectedListing?.owner_id === authenticatedUser.profileId) {
+      setStatusMessage('You cannot message your own listing.')
+      return false
+    }
 
     try {
       setLoadingAction(true)
@@ -768,6 +1025,10 @@ function App() {
 
   function sendMessage() {
     if (!authenticatedUser || !messageDraft.trim() || !selectedListing) return
+    if (selectedListing.owner_id === authenticatedUser.profileId) {
+      setStatusMessage('You cannot message your own listing.')
+      return
+    }
 
     requestConfirmation(
       'sendMessage',
@@ -793,6 +1054,12 @@ function App() {
     )
   }
 
+  function startTransaction(listing) {
+    if (!authenticatedUser || !listing || listing.owner_id === authenticatedUser.profileId) return
+
+    startTransactionNow(listing)
+  }
+
   function performLogout() {
     clearSession()
     clearPendingProfile()
@@ -800,6 +1067,8 @@ function App() {
     setFavorites([])
     setListings([])
     setSelectedListing(null)
+    setTransactions([])
+    setSelectedTransaction(null)
     setForm(emptyListingForm)
     setLoginForm(emptyLoginForm)
     setSignupForm(emptySignupForm)
@@ -860,6 +1129,11 @@ function App() {
 
     if (currentConfirmation.action === 'deleteConversation') {
       await deleteConversationNow(currentConfirmation.payload.conversation)
+      return
+    }
+
+    if (currentConfirmation.action === 'deleteListing') {
+      await deleteListingNow(currentConfirmation.payload.listing)
       return
     }
   }
@@ -999,6 +1273,51 @@ function App() {
     )
   }
 
+  if (visibleRoute === '/transactions') {
+    return (
+      <>
+        <TransactionsScreen
+          user={authenticatedUser}
+          activeRoute={visibleRoute}
+          navigate={navigate}
+          logout={logout}
+          transactions={transactions}
+          selectedTransaction={selectedTransaction}
+          onSelectTransaction={setSelectedTransaction}
+          onBuyTransaction={commitPurchaseNow}
+          onAcknowledgeTransaction={acknowledgeTransactionNow}
+          onFinalizeTransaction={finalizeTransactionNow}
+          onCancelTransaction={cancelTransactionNow}
+          onDeleteListing={(listing) => {
+            if (!listing) return
+
+            requestConfirmation(
+              'deleteListing',
+              { listing },
+              {
+                title: 'Delete this post?',
+                message:
+                  'This will permanently remove the listing and any linked transaction records.',
+                confirmLabel: 'Delete',
+              },
+            )
+          }}
+          statusMessage={statusMessage}
+          sidebarCards={sidebarCards}
+        />
+        <ConfirmModal
+          open={Boolean(confirmation)}
+          title={confirmation?.title || ''}
+          message={confirmation?.message || ''}
+          confirmLabel={confirmation?.confirmLabel || 'Confirm'}
+          cancelLabel="Cancel"
+          onConfirm={handleConfirmedAction}
+          onCancel={clearConfirmation}
+        />
+      </>
+    )
+  }
+
   if (visibleRoute === '/post-item') {
     return (
       <>
@@ -1052,6 +1371,8 @@ function App() {
           messageDraft={messageDraft}
         setMessageDraft={setMessageDraft}
         sendMessage={sendMessage}
+        onStartTransaction={startTransaction}
+        onOpenTransactions={() => navigate('/transactions')}
         navigate={navigate}
         logout={logout}
       />

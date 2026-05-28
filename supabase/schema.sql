@@ -23,8 +23,20 @@ create table if not exists public.listings (
   location text not null,
   description text not null,
   is_free boolean not null default false,
+  transaction_status text not null default 'available',
+  active_buyer_id uuid references public.profiles(id) on delete set null,
+  active_seller_id uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+alter table public.listings
+  add column if not exists transaction_status text not null default 'available';
+
+alter table public.listings
+  add column if not exists active_buyer_id uuid references public.profiles(id) on delete set null;
+
+alter table public.listings
+  add column if not exists active_seller_id uuid references public.profiles(id) on delete set null;
 
 alter table public.listings
   drop constraint if exists listings_title_length_check;
@@ -63,6 +75,13 @@ alter table public.listings
     )
   ) not valid;
 
+alter table public.listings
+  drop constraint if exists listings_transaction_status_check;
+
+alter table public.listings
+  add constraint listings_transaction_status_check
+  check (transaction_status in ('available', 'pending', 'ongoing', 'finalizing', 'sold')) not valid;
+
 create table if not exists public.listing_media (
   id uuid primary key default gen_random_uuid(),
   listing_id uuid references public.listings(id) on delete cascade,
@@ -99,11 +118,28 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.transactions (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid references public.listings(id) on delete cascade,
+  buyer_id uuid references public.profiles(id) on delete cascade,
+  seller_id uuid references public.profiles(id) on delete cascade,
+  agreed_price numeric(10,2) not null default 0,
+  status text not null default 'pending',
+  buyer_acknowledged boolean not null default false,
+  seller_acknowledged boolean not null default false,
+  note text,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (listing_id, buyer_id),
+  check (status in ('pending', 'ongoing', 'finalizing', 'completed', 'cancelled'))
+);
+
 alter table public.profiles enable row level security;
 alter table public.listings enable row level security;
 alter table public.listing_media enable row level security;
 alter table public.favorites enable row level security;
 alter table public.messages enable row level security;
+alter table public.transactions enable row level security;
 
 drop policy if exists "profiles are readable by authenticated users" on public.profiles;
 create policy "profiles are readable by authenticated users"
@@ -258,6 +294,88 @@ using (
   or exists (
     select 1 from public.profiles
     where profiles.id = messages.receiver_id
+    and profiles.auth_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "transactions readable by participants" on public.transactions;
+create policy "transactions readable by participants"
+on public.transactions for select
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.buyer_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.seller_id
+    and profiles.auth_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "transactions insertable by buyer" on public.transactions;
+create policy "transactions insertable by buyer"
+on public.transactions for insert
+to authenticated
+with check (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.buyer_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  and exists (
+    select 1
+    from public.listings
+    join public.profiles on profiles.id = listings.owner_id
+    where listings.id = transactions.listing_id
+    and listings.owner_id = transactions.seller_id
+  )
+);
+
+drop policy if exists "transactions updatable by participants" on public.transactions;
+create policy "transactions updatable by participants"
+on public.transactions for update
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.buyer_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.seller_id
+    and profiles.auth_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.buyer_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.seller_id
+    and profiles.auth_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "transactions deletable by participants" on public.transactions;
+create policy "transactions deletable by participants"
+on public.transactions for delete
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.buyer_id
+    and profiles.auth_user_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.profiles
+    where profiles.id = transactions.seller_id
     and profiles.auth_user_id = auth.uid()
   )
 );
