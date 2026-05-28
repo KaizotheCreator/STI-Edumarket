@@ -29,7 +29,7 @@ export default function ProfileScreen({
           </div>
 
           <div className="hero__panel">
-            <div className="panel-card">
+            <div className="panel-card panel-card--profile">
               <span className="pill pill--blue">Verified student profile</span>
               <h2>{user?.fullName}</h2>
               <ul>
