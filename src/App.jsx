@@ -160,6 +160,10 @@ function App() {
   }, [authReady, authenticatedUser, navigate, visibleRoute])
 
   useEffect(() => {
+    setStatusMessage('')
+  }, [visibleRoute])
+
+  useEffect(() => {
     if (!authenticatedUser || visibleRoute !== '/messages' || !selectedConversation) return
 
     let cancelled = false
