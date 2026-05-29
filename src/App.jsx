@@ -396,15 +396,20 @@ function App() {
               ? message.receiver_id
               : message.sender_id
           const key = `${message.listing_id}:${otherProfileId}`
+          const listing = listingMap.get(message.listing_id)
+          const userRole = listing?.owner_id === authenticatedUser.profileId ? 'Seller' : 'Buyer'
+          const otherRole = userRole === 'Seller' ? 'Buyer' : 'Seller'
 
           if (groupedConversations.has(key)) return
 
           groupedConversations.set(key, {
             key,
             listingId: message.listing_id,
-            listingTitle: listingMap.get(message.listing_id)?.title || 'Conversation',
+            listingTitle: listing?.title || 'Conversation',
             otherProfileId,
             otherName: profileMap.get(otherProfileId)?.full_name || 'Student',
+            userRole,
+            otherRole,
             preview: message.body,
             updatedAt: message.created_at,
           })
@@ -492,6 +497,8 @@ function App() {
       listingTitle: listing.title,
       otherProfileId: listing.owner_id,
       otherName: listing.seller,
+      userRole: 'Buyer',
+      otherRole: 'Seller',
     }
 
     setSelectedConversation(nextConversation)

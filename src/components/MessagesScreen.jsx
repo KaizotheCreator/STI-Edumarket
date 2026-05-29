@@ -104,6 +104,9 @@ export default function MessagesScreen({
                       {messages.length > 0 ? (
                         messages.map((message) => {
                           const isMine = message.sender_id === user?.profileId
+                          const messageRole = isMine
+                            ? selectedConversation.userRole || 'Buyer'
+                            : selectedConversation.otherRole || 'Seller'
                           return (
                             <article
                               key={message.id}
@@ -112,7 +115,7 @@ export default function MessagesScreen({
                               }`}
                             >
                               <span className="message-bubble__meta">
-                                {isMine ? 'You' : selectedConversation.otherName}
+                                {messageRole}
                               </span>
                               <p>{message.body}</p>
                             </article>
