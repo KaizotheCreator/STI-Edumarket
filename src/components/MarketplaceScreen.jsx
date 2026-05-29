@@ -1,6 +1,7 @@
 import React, { useRef } from 'react'
 import { categories } from '../data'
 import { AppShell } from './AppChrome'
+import RatingStars from './RatingStars'
 
 export default function MarketplaceScreen({
   user,
@@ -280,10 +281,13 @@ export default function MarketplaceScreen({
                     selectedListing.review ? (
                       <div className="empty-state empty-state--detail">
                         <h3>Buyer review</h3>
-                        <p>
-                          {selectedListing.review.rating}/5 stars
-                          {selectedListing.review.body ? ` - ${selectedListing.review.body}` : ''}
-                        </p>
+                        <div className="rating-summary">
+                          <RatingStars rating={selectedListing.review.rating} />
+                          <span className="rating-summary__value">
+                            {selectedListing.review.rating}/5
+                          </span>
+                        </div>
+                        {selectedListing.review.body ? <p>{selectedListing.review.body}</p> : null}
                       </div>
                     ) : (
                       <div className="empty-state empty-state--detail">

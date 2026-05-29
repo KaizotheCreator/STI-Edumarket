@@ -132,6 +132,13 @@ export default function MessagesScreen({
                       className="textarea"
                       value={draft}
                       onChange={(event) => setDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter' || event.shiftKey) return
+                        if (loadingMessage || !draft.trim()) return
+
+                        event.preventDefault()
+                        onSend()
+                      }}
                       placeholder="Write your reply..."
                       rows={4}
                     />

@@ -1,6 +1,7 @@
 import React from 'react'
 import { AppShell } from './AppChrome'
 import { getMessageTone } from '../lib/messageTone'
+import RatingStars from './RatingStars'
 
 export default function TransactionsScreen({
   user,
@@ -287,12 +288,13 @@ export default function TransactionsScreen({
                         {selectedTransaction.review ? (
                           <div className="empty-state empty-state--thread">
                             <h3>Review submitted</h3>
-                            <p>
-                              {selectedTransaction.review.rating}/5 stars
-                              {selectedTransaction.review.body
-                                ? ` - ${selectedTransaction.review.body}`
-                                : ''}
-                            </p>
+                            <div className="rating-summary">
+                              <RatingStars rating={selectedTransaction.review.rating} />
+                              <span className="rating-summary__value">
+                                {selectedTransaction.review.rating}/5
+                              </span>
+                            </div>
+                            {selectedTransaction.review.body ? <p>{selectedTransaction.review.body}</p> : null}
                           </div>
                         ) : (
                           <div className="review-module__form">
