@@ -13,7 +13,6 @@ import {
   clearPendingProfile,
   createSavedSession,
   deleteFavorite,
-  deleteListing,
   deleteTransaction,
   fetchFavorites,
   fetchListings,
@@ -88,6 +87,7 @@ function App() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [showFreeOnly, setShowFreeOnly] = useState(false)
+  const [showSavedOnly, setShowSavedOnly] = useState(false)
   const [marketplacePage, setMarketplacePage] = useState(1)
   const [selectedListing, setSelectedListing] = useState(null)
   const [favorites, setFavorites] = useState([])
@@ -291,12 +291,15 @@ function App() {
 
     return listings.filter((listing) => {
       const isLockedListing = ['pending', 'ongoing', 'finalizing'].includes(listing.transactionStatus)
+      const isDeletedListing = listing.transactionStatus === 'deleted'
       const isSoldListing = listing.transactionStatus === 'sold'
       const isParticipant =
         authenticatedUser &&
         (listing.activeBuyerId === authenticatedUser.profileId ||
           listing.activeSellerId === authenticatedUser.profileId)
-      const canSeeListing = isSoldListing || (!isLockedListing || isParticipant)
+      const canSeeListing = isDeletedListing
+        ? authenticatedUser && listing.owner_id === authenticatedUser.profileId
+        : isSoldListing || (!isLockedListing || isParticipant)
       const matchesSearch =
         !query ||
         [listing.title, listing.category, listing.seller, listing.description]
@@ -307,10 +310,11 @@ function App() {
       const matchesCategory = category === 'All' || listing.category === category
 
       const matchesFree = !showFreeOnly || listing.free
+      const matchesSaved = !showSavedOnly || favorites.includes(listing.id)
 
-      return canSeeListing && matchesSearch && matchesCategory && matchesFree
+      return canSeeListing && matchesSearch && matchesCategory && matchesFree && matchesSaved
     })
-  }, [category, listings, search, showFreeOnly])
+  }, [authenticatedUser, category, favorites, listings, search, showFreeOnly, showSavedOnly])
 
   const marketplacePageSize = 6
   const marketplacePageCount = Math.max(1, Math.ceil(visibleListings.length / marketplacePageSize))
@@ -325,7 +329,7 @@ function App() {
 
   useEffect(() => {
     setMarketplacePage(1)
-  }, [search, category, showFreeOnly])
+  }, [search, category, showFreeOnly, showSavedOnly])
 
   useEffect(() => {
     if (!authenticatedUser || visibleRoute !== '/marketplace') return
@@ -999,16 +1003,41 @@ function App() {
 
     try {
       setLoadingAction(true)
-      await deleteListing(authenticatedUser.accessToken, listing.id)
-      setListings((current) => current.filter((item) => item.id !== listing.id))
-      setTransactions((current) => current.filter((transaction) => transaction.listingId !== listing.id))
+      await updateListing(authenticatedUser.accessToken, listing.id, {
+        transaction_status: 'deleted',
+        active_buyer_id: null,
+        active_seller_id: null,
+      })
+      updateListingLocal(listing.id, {
+        transactionStatus: 'deleted',
+        activeBuyerId: null,
+        activeSellerId: null,
+      })
+      setTransactions((current) =>
+        current.map((transaction) =>
+          transaction.listingId === listing.id && transaction.status !== 'completed'
+            ? { ...transaction, status: 'cancelled' }
+            : transaction,
+        ),
+      )
+      if (selectedTransaction?.listingId === listing.id && selectedTransaction.status !== 'completed') {
+        setSelectedTransaction((current) =>
+          current?.listingId === listing.id ? { ...current, status: 'cancelled' } : current,
+        )
+      }
       if (selectedListing?.id === listing.id) {
-        setSelectedListing(null)
+        setSelectedListing((current) =>
+          current?.id === listing.id
+            ? {
+                ...current,
+                transactionStatus: 'deleted',
+                activeBuyerId: null,
+                activeSellerId: null,
+              }
+            : current,
+        )
       }
-      if (selectedTransaction?.listingId === listing.id) {
-        setSelectedTransaction(null)
-      }
-      setStatusMessage('Listing deleted.')
+      setStatusMessage('Listing moved to deleted state.')
     } catch (error) {
       setStatusMessage(error.message || 'Could not delete the listing.')
     } finally {
@@ -1492,26 +1521,28 @@ function App() {
 
   return (
     <>
-        <MarketplaceScreen
-          user={authenticatedUser}
-          activeRoute={visibleRoute}
-          sidebarCards={sidebarCards}
-          search={search}
+      <MarketplaceScreen
+        user={authenticatedUser}
+        activeRoute={visibleRoute}
+        sidebarCards={sidebarCards}
+        search={search}
         setSearch={setSearch}
         category={category}
         setCategory={setCategory}
         showFreeOnly={showFreeOnly}
         setShowFreeOnly={setShowFreeOnly}
-          visibleListings={visibleListings}
-          paginatedVisibleListings={paginatedVisibleListings}
-          selectedListing={selectedListing}
-          setSelectedListing={setSelectedListing}
-          currentPage={marketplacePage}
-          totalPages={marketplacePageCount}
-          onPageChange={setMarketplacePage}
-          favorites={favorites}
-          toggleFavorite={toggleFavorite}
-          messageDraft={messageDraft}
+        showSavedOnly={showSavedOnly}
+        setShowSavedOnly={setShowSavedOnly}
+        visibleListings={visibleListings}
+        paginatedVisibleListings={paginatedVisibleListings}
+        selectedListing={selectedListing}
+        setSelectedListing={setSelectedListing}
+        currentPage={marketplacePage}
+        totalPages={marketplacePageCount}
+        onPageChange={setMarketplacePage}
+        favorites={favorites}
+        toggleFavorite={toggleFavorite}
+        messageDraft={messageDraft}
         setMessageDraft={setMessageDraft}
         sendMessage={sendMessage}
         onStartTransaction={startTransaction}

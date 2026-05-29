@@ -12,6 +12,8 @@ export default function MarketplaceScreen({
   setCategory,
   showFreeOnly,
   setShowFreeOnly,
+  showSavedOnly,
+  setShowSavedOnly,
   visibleListings,
   paginatedVisibleListings,
   selectedListing,
@@ -81,14 +83,24 @@ export default function MarketplaceScreen({
                 <p className="eyebrow">Marketplace</p>
                 <h2>Find the right item fast</h2>
               </div>
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={showFreeOnly}
-                  onChange={(event) => setShowFreeOnly(event.target.checked)}
-                />
-                <span>Free listings only</span>
-              </label>
+              <div className="toggle-group">
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={showFreeOnly}
+                    onChange={(event) => setShowFreeOnly(event.target.checked)}
+                  />
+                  <span>Free listings only</span>
+                </label>
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={showSavedOnly}
+                    onChange={(event) => setShowSavedOnly(event.target.checked)}
+                  />
+                  <span>Saved items only</span>
+                </label>
+              </div>
             </div>
 
             <div className="controls">
@@ -124,6 +136,7 @@ export default function MarketplaceScreen({
                       listing.transactionStatus,
                     )
                     const isSoldListing = listing.transactionStatus === 'sold'
+                    const isDeletedListing = listing.transactionStatus === 'deleted'
                     const isParticipant =
                       listing.activeBuyerId === user?.profileId ||
                       listing.activeSellerId === user?.profileId
@@ -134,7 +147,7 @@ export default function MarketplaceScreen({
                           selectedListing?.id === listing.id ? 'card--selected' : ''
                         } ${preferredItems.includes(listing.category) ? 'card--preferred' : ''} ${
                           isOwnListing ? 'card--owned' : ''
-                        }`}
+                        } ${isDeletedListing ? 'card--disabled' : ''}`}
                         key={listing.id}
                         onClick={() => handleSelectListing(listing)}
                       >
@@ -144,6 +157,9 @@ export default function MarketplaceScreen({
                               {listing.free ? 'Free' : `PHP ${listing.price}`}
                             </span>
                             {isSoldListing ? <span className="pill pill--gray card__badge">Sold</span> : null}
+                            {isDeletedListing ? (
+                              <span className="pill pill--gray card__badge">Deleted</span>
+                            ) : null}
                             {preferredItems.includes(listing.category) ? (
                               <span className="pill pill--yellow card__badge">Recommended</span>
                             ) : null}
@@ -166,7 +182,7 @@ export default function MarketplaceScreen({
                         </div>
 
                         <div className="card__side">
-                          {!isOwnListing ? (
+                          {!isOwnListing && !isDeletedListing ? (
                             <button
                               className="icon-button"
                               onClick={(event) => {
@@ -306,6 +322,11 @@ export default function MarketplaceScreen({
                     <div className="empty-state empty-state--detail">
                       <h3>Sold listing</h3>
                       <p>This post has been finalized and is no longer available for purchase.</p>
+                    </div>
+                  ) : selectedListing.transactionStatus === 'deleted' ? (
+                    <div className="empty-state empty-state--detail">
+                      <h3>Deleted listing</h3>
+                      <p>This post has been removed by the seller and is no longer accessible.</p>
                     </div>
                   ) : selectedListing.transactionStatus === 'available' ? (
                     <div className="message-box">

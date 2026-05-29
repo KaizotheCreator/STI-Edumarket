@@ -939,6 +939,13 @@ textarea {
   color: var(--blue-900);
 }
 
+.toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
 .controls {
   margin-top: 1rem;
 }
@@ -1043,6 +1050,16 @@ textarea {
 .card--selected {
   transform: translateY(-2px);
   border-color: rgba(29, 78, 216, 0.28);
+}
+
+.card--disabled {
+  opacity: 0.72;
+  filter: saturate(0.8);
+  cursor: pointer;
+}
+
+.card--disabled:hover {
+  transform: translateY(-1px);
 }
 
 .card--preferred {
