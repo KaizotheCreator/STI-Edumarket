@@ -301,9 +301,7 @@ function App() {
         authenticatedUser &&
         (listing.activeBuyerId === authenticatedUser.profileId ||
           listing.activeSellerId === authenticatedUser.profileId)
-      const canSeeListing = isDeletedListing
-        ? authenticatedUser && listing.owner_id === authenticatedUser.profileId
-        : isSoldListing || (!isLockedListing || isParticipant)
+      const canSeeListing = isDeletedListing || isSoldListing || (!isLockedListing || isParticipant)
       const matchesSearch =
         !query ||
         [listing.title, listing.category, listing.seller, listing.description]
@@ -1024,9 +1022,22 @@ function App() {
             : transaction,
         ),
       )
-      if (selectedTransaction?.listingId === listing.id && selectedTransaction.status !== 'completed') {
+      if (selectedTransaction?.listingId === listing.id) {
         setSelectedTransaction((current) =>
-          current?.listingId === listing.id ? { ...current, status: 'cancelled' } : current,
+          current?.listingId === listing.id
+            ? {
+                ...current,
+                listing: current.listing
+                  ? {
+                      ...current.listing,
+                      transactionStatus: 'deleted',
+                      activeBuyerId: null,
+                      activeSellerId: null,
+                    }
+                  : current.listing,
+                status: current.status === 'completed' ? current.status : 'cancelled',
+              }
+            : current,
         )
       }
       if (selectedListing?.id === listing.id) {

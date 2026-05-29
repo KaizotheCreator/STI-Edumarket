@@ -273,7 +273,9 @@ export default function TransactionsScreen({
                       </span>
                     ) : null}
 
-                    {selectedTransaction.status === 'completed' && activeRole === 'seller' ? (
+                    {selectedTransaction.status === 'completed' &&
+                    activeRole === 'seller' &&
+                    selectedTransaction.listing?.transactionStatus !== 'deleted' ? (
                       <button
                         type="button"
                         className="button button--yellow"
@@ -281,6 +283,12 @@ export default function TransactionsScreen({
                       >
                         Delete post
                       </button>
+                    ) : null}
+
+                    {selectedTransaction.listing?.transactionStatus === 'deleted' ? (
+                      <span className="section__note section__note--neutral">
+                        This listing has already been deleted.
+                      </span>
                     ) : null}
 
                     {selectedTransaction.status === 'completed' && activeRole === 'buyer' ? (

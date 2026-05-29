@@ -80,7 +80,7 @@ alter table public.listings
 
 alter table public.listings
   add constraint listings_transaction_status_check
-  check (transaction_status in ('available', 'pending', 'ongoing', 'finalizing', 'sold')) not valid;
+  check (transaction_status in ('available', 'pending', 'ongoing', 'finalizing', 'sold', 'deleted')) not valid;
 
 create table if not exists public.listing_media (
   id uuid primary key default gen_random_uuid(),
