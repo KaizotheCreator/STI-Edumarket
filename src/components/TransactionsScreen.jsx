@@ -1,5 +1,6 @@
 import React from 'react'
 import { AppShell } from './AppChrome'
+import { getMessageTone } from '../lib/messageTone'
 
 export default function TransactionsScreen({
   user,
@@ -168,7 +169,11 @@ export default function TransactionsScreen({
                     />
                   </div>
 
-                  {statusMessage ? <p className="section__note">{statusMessage}</p> : null}
+                  {statusMessage ? (
+                    <p className={`section__note section__note--${getMessageTone(statusMessage)}`}>
+                      {statusMessage}
+                    </p>
+                  ) : null}
 
                   <div className="transaction-actions">
                     {selectedTransaction.status === 'pending' && activeRole === 'buyer' ? (
@@ -202,7 +207,9 @@ export default function TransactionsScreen({
 
                     {selectedTransaction.status === 'ongoing' && activeRole === 'buyer' ? (
                       buyerAcknowledged ? (
-                        <span className="section__note">Acknowledged. Waiting for the seller.</span>
+                        <span className="section__note section__note--info">
+                          Acknowledged. Waiting for the seller.
+                        </span>
                       ) : (
                         <button
                           type="button"
@@ -217,7 +224,9 @@ export default function TransactionsScreen({
                     {selectedTransaction.status === 'ongoing' && activeRole === 'seller' ? (
                       <>
                         {sellerAcknowledged ? (
-                          <span className="section__note">Acknowledged. Waiting for the buyer.</span>
+                          <span className="section__note section__note--info">
+                            Acknowledged. Waiting for the buyer.
+                          </span>
                         ) : (
                           <button
                             type="button"
@@ -258,7 +267,7 @@ export default function TransactionsScreen({
                     ) : null}
 
                     {selectedTransaction.status === 'finalizing' && activeRole === 'buyer' ? (
-                      <span className="section__note">
+                      <span className="section__note section__note--info">
                         Both sides acknowledged. Waiting for the seller to finalize the sale.
                       </span>
                     ) : null}

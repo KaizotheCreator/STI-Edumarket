@@ -2,6 +2,7 @@ import React from 'react'
 import BrandMark from './BrandMark'
 import { Field, PasswordField } from './Field'
 import { preferredItemOptions } from '../data'
+import { getMessageTone } from '../lib/messageTone'
 
 export default function AuthScreen({
   route,
@@ -41,7 +42,11 @@ export default function AuthScreen({
             </p>
         </div>
 
-        {authMessage ? <div className="auth-message">{authMessage}</div> : null}
+        {authMessage ? (
+          <div className={`auth-message auth-message--${getMessageTone(authMessage)}`}>
+            {authMessage}
+          </div>
+        ) : null}
 
         <div className="auth-tabs" role="tablist" aria-label="Authentication tabs">
           <button

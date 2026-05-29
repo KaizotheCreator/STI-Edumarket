@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import { categories, meetupLocations } from '../data'
 import { Field } from './Field'
 import { AppShell } from './AppChrome'
+import { getMessageTone } from '../lib/messageTone'
 
 export default function PostItemScreen({
   user,
@@ -65,7 +66,9 @@ export default function PostItemScreen({
                 <p className="eyebrow">Sell or Give Away</p>
                 <h2>Post a new listing</h2>
               </div>
-              <p className="section__note">{statusMessage}</p>
+              <p className={`section__note section__note--${getMessageTone(statusMessage)}`}>
+                {statusMessage}
+              </p>
             </div>
 
             <form className="form form--single" onSubmit={handleSubmitListing}>

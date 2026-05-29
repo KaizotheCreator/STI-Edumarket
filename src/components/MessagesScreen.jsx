@@ -1,5 +1,6 @@
 import React from 'react'
 import { AppShell } from './AppChrome'
+import { getMessageTone } from '../lib/messageTone'
 
 export default function MessagesScreen({
   user,
@@ -106,7 +107,9 @@ export default function MessagesScreen({
                           return (
                             <article
                               key={message.id}
-                              className={`message-bubble ${isMine ? 'message-bubble--mine' : ''}`}
+                              className={`message-bubble ${
+                                isMine ? 'message-bubble--mine' : 'message-bubble--theirs'
+                              }`}
                             >
                               <span className="message-bubble__meta">
                                 {isMine ? 'You' : selectedConversation.otherName}
@@ -132,7 +135,13 @@ export default function MessagesScreen({
                       placeholder="Write your reply..."
                       rows={4}
                     />
-                    {statusMessage ? <p className="section__note">{statusMessage}</p> : null}
+                    {statusMessage ? (
+                      <p
+                        className={`section__note section__note--${getMessageTone(statusMessage)}`}
+                      >
+                        {statusMessage}
+                      </p>
+                    ) : null}
                     <button
                       className="button button--primary"
                       onClick={onSend}
