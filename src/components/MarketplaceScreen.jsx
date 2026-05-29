@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { categories } from '../data'
 import { AppShell } from './AppChrome'
 
@@ -30,6 +30,15 @@ export default function MarketplaceScreen({
   sidebarCards,
 }) {
   const preferredItems = user?.preferredItems || []
+  const detailRef = useRef(null)
+
+  function handleSelectListing(listing) {
+    setSelectedListing(listing)
+    detailRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
 
   return (
     <AppShell
@@ -126,7 +135,7 @@ export default function MarketplaceScreen({
                           isOwnListing ? 'card--owned' : ''
                         }`}
                         key={listing.id}
-                        onClick={() => setSelectedListing(listing)}
+                        onClick={() => handleSelectListing(listing)}
                       >
                         <div className="card__body">
                           <div className="card__top">
@@ -230,7 +239,7 @@ export default function MarketplaceScreen({
             )}
           </section>
 
-          <section className="detail section">
+          <section className="detail section" id="listing-detail" ref={detailRef}>
             <div className="detail__box">
               <p className="eyebrow">Item Details</p>
               {selectedListing ? (
